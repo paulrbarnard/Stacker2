@@ -14,24 +14,39 @@ import SwiftUI
 
 let messageStartedNotificationID = "com.toxic.messageStartedNotificationID"
 let messageCompleteNotificationID = "com.toxic.messageCompleteNotificationID"
+let messageCountNotificationID = "com.toxic.messageCountNotificationID"
 
 class Messager {
     
-    
-    var keyStrokePeriod = 1.0
+	@ObservedObject var sharedAttributes: SharedAttributes
+	
+    var keyStrokePeriod = 2.0
     var sending = false
     
     var messageQueue: [String] = []
     var async = true
-    var silent = false
+    var silent = true
     
     @State var timer = Timer()
     
-    
-     
-
+	init(sharedAttributes: SharedAttributes = SharedAttributes()) {
+		self.sharedAttributes = sharedAttributes
+	}
+	
     func sendKeyPress (_ string: String, to: String = "System Events") -> Bool{
-        return runAppleScript(string: "tell application \"\(to)\" to keystroke \"\(string)\"")
+        var strings = [String]()
+        var str = string
+        var returnValue = false
+		while str.count > sharedAttributes.keyLen {
+            // split in to keyLen character chunks
+			strings.append(String(str.prefix(sharedAttributes.keyLen)))
+			str = String(str.dropFirst(sharedAttributes.keyLen))
+        }
+            strings.append(str)
+        for value in strings {
+            returnValue = runAppleScript(string: "tell application \"\(to)\" to keystroke \"\(value)\"")
+        }
+        return returnValue
     }
 
 
@@ -56,7 +71,7 @@ class Messager {
         if async == true {
             // asyncronus mode so buffer the message
             messageQueue.append(string)  // add the message to the queue
-            printMessage("Buffered message \"\(string)\"")
+            //printMessage("Buffered message \"\(string)\"")
             if sending == false {
                 // not currently sending and asyncronous mode so start the send timer
                 NotificationCenter.default.post(name: Notification.Name(rawValue: messageStartedNotificationID), object: self)
@@ -90,13 +105,17 @@ class Messager {
         if self.messageQueue.count > 0 {
             // there are messages in the queue
             let nextString = self.messageQueue.remove(at: 0)
+            _ = activateStacker()
             _ = activateRemote()
             sendTheMessage(nextString)
-            _ = activateStacker()
+            getKeys(nextString)
         } else if self.sending == true{
             printMessage("Buffer now empty")
+            timer.invalidate()
             self.sending = false
-            NotificationCenter.default.post(name: Notification.Name(rawValue: messageCompleteNotificationID), object: self)        }
+            NotificationCenter.default.post(name: Notification.Name(rawValue: messageCompleteNotificationID), object: self)
+            
+        }
     }
     
     private func printMessage(_ string:String){
@@ -105,7 +124,25 @@ class Messager {
         }
     }
     
-    
+    private func getKeys(_ str:String){
+        if let range: Range<String.Index> = str.range(of: "keystroke") {
+            let index: Int = str.distance(from: str.startIndex, to: range.upperBound)
+            let keyString = String(str.dropFirst(index))
+            let qCount = keyString.filter {$0 == "q"}.count
+            let wCount = keyString.filter {$0 == "w"}.count
+            let eCount = keyString.filter {$0 == "e"}.count
+            let rCount = keyString.filter {$0 == "r"}.count
+            let tCount = keyString.filter {$0 == "t"}.count
+            let yCount = keyString.filter {$0 == "y"}.count
+			let count = ((qCount * sharedAttributes.qSize) + (wCount * sharedAttributes.wSize) + (eCount * sharedAttributes.eSize) + (rCount * sharedAttributes.rSize) + (tCount * sharedAttributes.tSize) + (yCount * sharedAttributes.ySize))
+			//print ("keyString:",keyString,"Count:",count)
+           let countDict:[String: Int] = ["count": count]
+            NotificationCenter.default.post(name: Notification.Name(rawValue: messageCountNotificationID), object: self, userInfo: countDict)
+        }
+    }
     
     
 }
+
+
+

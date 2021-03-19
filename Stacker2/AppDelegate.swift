@@ -13,14 +13,33 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     var window: NSWindow!
+	@ObservedObject var sharedAttributes = SharedAttributes()
+	var preferencesWindow: NSWindow!    // << here
 
+	@objc func openPreferencesWindow() {
+		if nil == preferencesWindow {      // create once !!
+			let preferencesView = PreferencesView(sharedAttributes: sharedAttributes)
+			// Create the preferences window and set content
+			preferencesWindow = NSWindow(
+				contentRect: NSRect(x: 20, y: 20, width: 480, height: 300),
+				styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+				backing: .buffered,
+				defer: false)
+			preferencesWindow.center()
+			preferencesWindow.setFrameAutosaveName("Preferences")
+			preferencesWindow.isReleasedWhenClosed = false
+			preferencesWindow.contentView = NSHostingView(rootView: preferencesView)
+		}
+		preferencesWindow.makeKeyAndOrderFront(nil)
+	}
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+		let messager = Messager(sharedAttributes: sharedAttributes)
         // Create the SwiftUI view that provides the window contents.
-        let contentView = ContentView()
+		let contentView = ContentView(sharedAttributes: sharedAttributes, messager: messager)
         // Create the window and set the content view.
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 150, height: 300),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false)
         window.center()
